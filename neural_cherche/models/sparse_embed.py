@@ -68,7 +68,7 @@ class SparseEmbed(Splade):
     ...     documents=["Sports is great.", "Music is great."],
     ...     batch_size=1,
     ... )
-    tensor([64.2330, 54.0180], device='mps:0')
+    tensor([62.1692, 24.4986], device='mps:0')
 
     >>> _ = model.save_pretrained("checkpoint")
 
@@ -82,7 +82,7 @@ class SparseEmbed(Splade):
     ...     documents=["Sports is great.", "Music is great."],
     ...     batch_size=2,
     ... )
-    tensor([64.2330, 54.0180])
+    tensor([62.1692, 24.4986])
 
     References
     ----------
@@ -96,12 +96,16 @@ class SparseEmbed(Splade):
         embedding_size: int = 128,
         max_length_query: int = 128,
         max_length_document: int = 256,
+        add_special_tokens: bool = True,
         device: str = None,
         **kwargs,
     ) -> None:
         super(SparseEmbed, self).__init__(
             model_name_or_path=model_name_or_path,
             device=device,
+            add_special_tokens=add_special_tokens,
+            max_length_query=max_length_query,
+            max_length_document=max_length_document,
             extra_files_to_load=["linear.pt", "metadata.json"],
             **kwargs,
         )
@@ -131,20 +135,12 @@ class SparseEmbed(Splade):
         if os.path.exists(os.path.join(self.model_folder, "linear.pt")):
             self.linear.load_state_dict(linear)
 
-        if os.path.exists(os.path.join(self.model_folder, "metadata.json")):
-            with open(os.path.join(self.model_folder, "metadata.json"), "r") as file:
-                metadata = json.load(file)
-
-            max_length_query = metadata["max_length_query"]
-            max_length_document = metadata["max_length_document"]
-
-        self.max_length_query = max_length_query
-        self.max_length_document = max_length_document
-
     def forward(
         self,
         texts: list[str],
         query_mode: bool = True,
+        queries_activations: int = None,
+        documents_activations: int = None,
         **kwargs,
     ) -> dict[str, torch.Tensor]:
         """Pytorch forward method.
@@ -156,10 +152,6 @@ class SparseEmbed(Splade):
         query_mode
             Whether to encode queries or documents.
         """
-        suffix = "[Q] " if query_mode else "[D] "
-
-        texts = [suffix + text for text in texts]
-
         self.tokenizer.pad_token = (
             self.query_pad_token if query_mode else self.original_pad_token
         )
@@ -171,7 +163,7 @@ class SparseEmbed(Splade):
             truncation=True,
             padding="max_length",
             max_length=k_tokens,
-            add_special_tokens=True,
+            add_special_tokens=self.add_special_tokens,
             **kwargs,
         )
 

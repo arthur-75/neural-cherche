@@ -118,10 +118,6 @@ class ColBERT:
             **kwargs,
         )
 
-        for _, embedding in embeddings.items():
-            if embedding.shape[0] < self.model.max_length_document:
-                raise ValueError(embedding.shape)
-
         return {
             document[self.key]: embedding
             for document, embedding in zip(documents, embeddings.values())

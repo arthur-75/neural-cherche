@@ -21,6 +21,16 @@ class Splade(Base):
         HuggingFace AutoModelForMaskedLM.
     kwargs
         Additional parameters to the SentenceTransformer model.
+    queries_activations
+        Number of activations to keep for queries.
+    documents_activations
+        Number of activations to keep for documents.
+    max_length_query
+        Maximum length of the queries.
+    max_length_document
+        Maximum length of the documents.
+    add_special_tokens
+        Whether to add special tokens.
 
     Examples
     --------
@@ -51,13 +61,13 @@ class Splade(Base):
     ...     documents=["Sports is great.", "Music is great."],
     ...     batch_size=1
     ... )
-    tensor([318.1384, 271.8006], device='mps:0')
+    tensor([134.9539,  84.2086], device='mps:0')
 
     >>> _ = model.save_pretrained("checkpoint")
 
     >>> model = models.Splade(
     ...     model_name_or_path="checkpoint",
-    ...     device="mps",
+    ...     device="cpu",
     ... )
 
     >>> model.scores(
@@ -65,7 +75,7 @@ class Splade(Base):
     ...     documents=["Sports is great.", "Music is great."],
     ...     batch_size=1
     ... )
-    tensor([318.1384, 271.8006], device='mps:0')
+    tensor([134.9538,  84.2086])
 
     References
     ----------
@@ -77,8 +87,11 @@ class Splade(Base):
         self,
         model_name_or_path: str = None,
         device: str = None,
-        max_length_query: int = 128,
-        max_length_document: int = 256,
+        queries_activations: int = 64,
+        documents_activations: int = 128,
+        max_length_query: int = 512,
+        max_length_document: int = 512,
+        add_special_tokens: bool = True,
         extra_files_to_load: list[str] = ["metadata.json"],
         **kwargs,
     ) -> None:
@@ -95,16 +108,24 @@ class Splade(Base):
             with open(os.path.join(self.model_folder, "metadata.json"), "r") as file:
                 metadata = json.load(file)
 
+            queries_activations = metadata.get("queries_activations", 64)
+            documents_activations = metadata.get("documents_activations", 128)
             max_length_query = metadata["max_length_query"]
             max_length_document = metadata["max_length_document"]
+            add_special_tokens = metadata.get("add_special_tokens", True)
 
+        self.queries_activations = queries_activations
+        self.documents_activations = documents_activations
         self.max_length_query = max_length_query
         self.max_length_document = max_length_document
+        self.add_special_tokens = add_special_tokens
 
     def encode(
         self,
         texts: list[str],
         query_mode: bool = True,
+        queries_activations: int = None,
+        documents_activations: int = None,
         **kwargs,
     ) -> dict[str, torch.Tensor]:
         """Encode documents
@@ -124,6 +145,8 @@ class Splade(Base):
             return self(
                 texts=texts,
                 query_mode=query_mode,
+                queries_activations=queries_activations,
+                documents_activations=documents_activations,
                 **kwargs,
             )
 
@@ -167,6 +190,8 @@ class Splade(Base):
         self,
         texts: list[str],
         query_mode: bool,
+        queries_activations: int = None,
+        documents_activations: int = None,
         **kwargs,
     ) -> dict[str, torch.Tensor]:
         """Pytorch forward method.
@@ -178,30 +203,40 @@ class Splade(Base):
         query_mode
             Whether to encode queries or documents.
         """
-        suffix = "[Q] " if query_mode else "[D] "
-
-        texts = [suffix + text for text in texts]
-
         self.tokenizer.pad_token = (
             self.query_pad_token if query_mode else self.original_pad_token
         )
-
-        k_tokens = self.max_length_query if query_mode else self.max_length_document
 
         logits, _ = self._encode(
             texts=texts,
             truncation=True,
             padding="max_length",
-            max_length=k_tokens,
-            add_special_tokens=True,
+            max_length=self.max_length_query
+            if query_mode
+            else self.max_length_document,
+            add_special_tokens=self.add_special_tokens,
             **kwargs,
         )
+
+        queries_activations = (
+            self.queries_activations
+            if queries_activations is None
+            else queries_activations
+        )
+
+        documents_activations = (
+            self.documents_activations
+            if documents_activations is None
+            else documents_activations
+        )
+
+        n_activations = queries_activations if query_mode else documents_activations
 
         activations = self._get_activation(logits=logits)
 
         activations = self._update_activations(
             **activations,
-            k_tokens=k_tokens,
+            k_tokens=n_activations,
         )
 
         return {"sparse_activations": activations["sparse_activations"]}
@@ -225,6 +260,9 @@ class Splade(Base):
                 obj={
                     "max_length_query": self.max_length_query,
                     "max_length_document": self.max_length_document,
+                    "queries_activations": self.queries_activations,
+                    "documents_activations": self.documents_activations,
+                    "add_special_tokens": self.add_special_tokens,
                 },
                 indent=4,
             )
@@ -237,6 +275,8 @@ class Splade(Base):
         documents: list[str],
         batch_size: int = 32,
         tqdm_bar: bool = True,
+        queries_activations: int = None,
+        documents_activations: int = None,
         **kwargs,
     ) -> torch.Tensor:
         """Compute similarity scores between queries and documents.
@@ -266,12 +306,16 @@ class Splade(Base):
             queries_embeddings = self.encode(
                 batch_queries,
                 query_mode=True,
+                queries_activations=queries_activations,
+                documents_activations=documents_activations,
                 **kwargs,
             )
 
             documents_embeddings = self.encode(
                 batch_documents,
                 query_mode=False,
+                queries_activations=queries_activations,
+                documents_activations=documents_activations,
                 **kwargs,
             )
 

@@ -67,15 +67,15 @@ class Splade(TfIdf):
     ... )
 
     >>> pprint(scores)
-    [[{'id': 0, 'similarity': 489.65244},
-      {'id': 2, 'similarity': 338.9705},
-      {'id': 1, 'similarity': 332.3472}],
-     [{'id': 1, 'similarity': 470.40497},
-      {'id': 2, 'similarity': 301.56982},
-      {'id': 0, 'similarity': 278.8062}],
-     [{'id': 2, 'similarity': 472.487},
-      {'id': 1, 'similarity': 341.8396},
-      {'id': 0, 'similarity': 319.97287}]]
+    [[{'id': 0, 'similarity': 274.75342},
+      {'id': 2, 'similarity': 72.795494},
+      {'id': 1, 'similarity': 72.72586}],
+     [{'id': 1, 'similarity': 297.33722},
+      {'id': 2, 'similarity': 105.64936},
+      {'id': 0, 'similarity': 67.812744}],
+     [{'id': 2, 'similarity': 282.984},
+      {'id': 1, 'similarity': 103.99881},
+      {'id': 0, 'similarity': 75.31299}]]
 
     """
 
@@ -97,9 +97,9 @@ class Splade(TfIdf):
     def encode_documents(
         self,
         documents: list[dict],
+        activations: int = 128,
         batch_size: int = 32,
         tqdm_bar: bool = True,
-        query_mode: bool = False,
         **kwargs,
     ) -> dict[str, csr_matrix]:
         """Encode queries into sparse matrix.
@@ -108,6 +108,8 @@ class Splade(TfIdf):
         ----------
         documents
             Documents to encode.
+        activations
+            Number of activated tokens. This parameter can be tuned.
         batch_size
             Batch size.
         tqdm_bar
@@ -126,7 +128,8 @@ class Splade(TfIdf):
                     " ".join([doc.get(field, "") for field in self.on])
                     for doc in batch_documents
                 ],
-                query_mode=query_mode,
+                query_mode=False,
+                documents_activations=activations,
                 **kwargs,
             )
 
@@ -141,9 +144,9 @@ class Splade(TfIdf):
     def encode_queries(
         self,
         queries: list[str],
+        activations: int = 64,
         batch_size: int = 32,
         tqdm_bar: bool = True,
-        query_mode: bool = True,
         **kwargs,
     ) -> dict[str, csr_matrix]:
         """Encode queries into sparse matrix.
@@ -152,6 +155,8 @@ class Splade(TfIdf):
         ----------
         documents
             Documents to encode.
+        activations
+            Number of activated tokens. This parameter can be tuned.
         batch_size
             Batch size.
         tqdm_bar
@@ -167,7 +172,8 @@ class Splade(TfIdf):
         ):
             embeddings = self.model.encode(
                 batch_queries,
-                query_mode=query_mode,
+                query_mode=True,
+                queries_activations=activations,
                 **kwargs,
             )
 

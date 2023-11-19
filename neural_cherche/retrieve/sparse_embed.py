@@ -46,7 +46,7 @@ class SparseEmbed(TfIdf):
     ... )
 
     >>> documents = [
-    ...     {"id": 0, "document": "Food Hello world"},
+    ...     {"id": 0, "document": "Food"},
     ...     {"id": 1, "document": "Sports"},
     ...     {"id": 2, "document": "Cinema"},
     ... ]
@@ -73,15 +73,15 @@ class SparseEmbed(TfIdf):
     ... )
 
     >>> pprint(scores)
-    [[{'id': 0, 'similarity': 65.11363983154297},
-      {'id': 1, 'similarity': 59.01810836791992},
-      {'id': 2, 'similarity': 40.613182067871094}],
-     [{'id': 1, 'similarity': 97.81436920166016},
-      {'id': 0, 'similarity': 42.08279037475586},
-      {'id': 2, 'similarity': 32.50034713745117}],
-     [{'id': 2, 'similarity': 56.019283294677734},
-      {'id': 1, 'similarity': 37.612735748291016},
-      {'id': 0, 'similarity': 31.05425453186035}]]
+    [[{'id': 0, 'similarity': 79.04783630371094},
+      {'id': 1, 'similarity': 19.48548698425293},
+      {'id': 2, 'similarity': 13.42795181274414}],
+     [{'id': 1, 'similarity': 82.74070739746094},
+      {'id': 2, 'similarity': 18.100317001342773},
+      {'id': 0, 'similarity': 14.646890640258789}],
+     [{'id': 2, 'similarity': 66.94291687011719},
+      {'id': 1, 'similarity': 23.132431030273438},
+      {'id': 0, 'similarity': 13.63134479522705}]]
 
     """
 
